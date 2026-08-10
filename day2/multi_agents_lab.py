@@ -254,39 +254,94 @@ and the critique has been addressed."""
 
 def researcher_node(state: TeamState):
     """Search the web (ONLY this agent may), condense to notes."""
-    # TODO:
-    # 1. results = search_tool.invoke({"query": state["task"]})["results"]
-    # 2. Format results into a raw text block (title, content, url)
-    # 3. notes = run_persona("researcher", f"Task ...\n\nSearch results:\n{raw}")
-    # 4. return {"research_notes": [notes], "execution_logs": [...]}
-    #    ^ note the LIST — research_notes is append-only!
-    pass
-
-
+    results = search_tool.invoke({"query": state["task"]})["results"]
+ 
+    raw = "\n\n".join(
+        f"Title: {r['title']}\nContent: {r['content']}\nURL: {r['url']}"
+        for r in results
+    )
+ 
+    notes = run_persona(
+        "researcher",
+        f"Task: {state['task']}\n\nSearch results:\n{raw}",
+    )
+ 
+    # LIST — research_notes is append-only, so round 2 joins round 1
+    return {
+        "research_notes": [notes],
+        "execution_logs": [f"researcher: condensed {len(results)} sources into notes"],
+    }
+ 
+ 
 def analyst_node(state: TeamState):
     """Turn raw notes into analysis."""
-    # TODO: run_persona("analyst", ...) → {"analysis": ..., "execution_logs": [...]}
-    pass
-
-
+    notes = "\n\n---\n\n".join(state["research_notes"])
+ 
+    analysis = run_persona(
+        "analyst",
+        f"Task: {state['task']}\n\nResearch notes:\n{notes}",
+    )
+ 
+    return {
+        "analysis": analysis,
+        "execution_logs": ["analyst: produced analysis from research notes"],
+    }
+ 
+ 
 def writer_node(state: TeamState):
     """Write the draft — or REVISE it if a critique is present."""
-    # TODO:
-    # 1. revising = critique exists and starts with "REVISE"
-    # 2. Build the prompt; when revising, include the previous draft
-    #    AND the critique so the writer knows what to fix.
-    # 3. return {"draft": ...,
-    #            "critique": "",   <- WHY reset this? (see self-check)
-    #            "revision_count": +1 only when revising,
-    #            "execution_logs": [...]}
-    pass
-
-
+    critique = state.get("critique", "")
+    revising = bool(critique) and critique.startswith("REVISE")
+ 
+    if revising:
+        user_content = (
+            f"Task: {state['task']}\n\n"
+            f"Analysis:\n{state['analysis']}\n\n"
+            f"Your previous draft:\n{state['draft']}\n\n"
+            f"Critique to address:\n{critique}\n\n"
+            f"Revise the draft so that every issue raised is fixed."
+        )
+    else:
+        user_content = (
+            f"Task: {state['task']}\n\n"
+            f"Analysis:\n{state['analysis']}\n\n"
+            f"Write the draft."
+        )
+ 
+    draft = run_persona("writer", user_content)
+    revision_count = state["revision_count"] + (1 if revising else 0)
+ 
+    return {
+        "draft": draft,
+        # Reset: a critique is a work order, not a record. Once addressed it
+        # describes a draft that no longer exists. Leaving it set would make
+        # the writer loop on a ghost and the supervisor route on stale data.
+        # Empty critique now means "nobody has reviewed the current draft".
+        "critique": "",
+        "revision_count": revision_count,
+        "execution_logs": [
+            f"writer: {'revised' if revising else 'wrote'} draft "
+            f"(revision {revision_count})"
+        ],
+    }
+ 
+ 
 def critic_node(state: TeamState):
     """Review the draft against the research notes."""
-    # TODO: run_persona("critic", ...) → the persona replies either
-    # "APPROVED" or "REVISE: <fixes>". Store it in critique.
-    pass
+    notes = "\n\n---\n\n".join(state["research_notes"])
+ 
+    critique = run_persona(
+        "critic",
+        f"Task: {state['task']}\n\n"
+        f"Research notes:\n{notes}\n\n"
+        f"Draft to review:\n{state['draft']}",
+    )
+ 
+    return {
+        "critique": critique,
+        "execution_logs": [f"critic: {critique[:70]}"],
+    }
+ 
 
 
 # ============================================================
@@ -314,6 +369,40 @@ def critic_node(state: TeamState):
 # TODO: route_from_supervisor + graph wiring
 
 
+def route_from_supervisor(state: TeamState) -> str:
+    return state["next_agent"]
+
+
+builder = StateGraph(TeamState)
+
+# 1. all five nodes
+builder.add_node("supervisor", supervisor_node)
+builder.add_node("researcher", researcher_node)
+builder.add_node("analyst", analyst_node)
+builder.add_node("writer", writer_node)
+builder.add_node("critic", critic_node)
+
+# 2. START → supervisor
+builder.add_edge(START, "supervisor")
+
+# 3. supervisor fans out
+builder.add_conditional_edges(
+    "supervisor",
+    route_from_supervisor,
+    {
+        "researcher": "researcher",
+        "analyst": "analyst",
+        "writer": "writer",
+        "critic": "critic",
+        "FINISH": END,
+    },
+)
+
+# 4. every worker returns to the hub
+for worker in ["researcher", "analyst", "writer", "critic"]:
+    builder.add_edge(worker, "supervisor")
+
+app = builder.compile()
 # ============================================================
 # STEP 7 — COMPILE, VISUALIZE, RUN
 # ============================================================
