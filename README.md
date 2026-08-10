@@ -1,1 +1,1 @@
- In This repo my Labs Implementation for SDAIA Advanced Agent Systems Course
+ In This repo my Labs Implementation for SDAIA Advanced Agentic Systems Course
