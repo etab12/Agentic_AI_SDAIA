@@ -135,11 +135,50 @@ class RouterDecision(BaseModel):
 # That's a deliberate design decision, not a limitation — ask
 # yourself what could go wrong if the critic could search.
 
+
+# Identify the 4 personas
 PERSONAS = {
-    # TODO: four personas
+    "researcher": (
+        "You are an expert researcher. Your role in the team is to gather facts and sources on the topic. "
+        "You do NOT analyze, judge, or draw conclusions — you only report what you found, "
+        "with sources. Hand raw findings to the next agent."
+    ),
+    "analyst": (
+        "You are an analyst. Your task is to identify patterns,"
+        "trade-offs, and implications in the research findings. You do NOT gather new facts and you do NOT "
+        "critique the work — only interpret what you were given."
+    ),
+    "critic": (
+        "You are a critic. You review the analysis for weak reasoning, unsupported "
+        "claims, and missing considerations. You do NOT add new research or rewrite "
+        "the work — only identify problems, specifically and concretely."
+    ),
+    "writer": (
+        "You are a writer. You synthesize research, analysis, and critique into a "
+        "clear final answer for the user. You do NOT introduce new claims — only "
+        "present what the other agents produced."
+    ),
 }
 
-# TODO: llm, search_tool, supervisor_llm, run_persona
+# Define llms, research tool, and the supervisor
+
+ llm = ChatOpenAI(
+        model="nvidia/nemotron-3-super-120b-a12b:free",
+        temperature=0,
+        base_url="https://openrouter.ai/api/v1",
+    )
+
+search_tool = TavilySearch(max_results=4)
+
+supervisor_llm = llm.with_structured_output(RouterDecision)
+
+# run personas 
+def run_persona(role: str, user_content: str) -> str:
+    response = llm.invoke([
+        SystemMessage(content=PERSONAS[role]),
+        HumanMessage(content=user_content),
+    ])
+    return response.content
 
 
 # ============================================================
@@ -162,9 +201,49 @@ PERSONAS = {
 #
 # WHERE TO LOOK: multi-agent docs → "Supervisor" section.
 
+
+
+
 def supervisor_node(state: TeamState):
-    # TODO
-    pass
+    turn_count = state["turn_count"] + 1
+
+    # 2. STATUS, not content — booleans and counts only
+    status = f"""Task: {state['task']}
+
+Blackboard status:
+- research: {'FILLED' if state.get('research') else 'EMPTY'}
+- analysis: {'FILLED' if state.get('analysis') else 'EMPTY'}
+- draft: {'FILLED' if state.get('draft') else 'EMPTY'}
+- critique: {state.get('critique') or 'none yet'}
+
+turn_count: {turn_count}/{MAX_TURNS}
+revision_count: {state['revision_count']}/{MAX_REVISIONS}
+
+Which agent should act next? Choose FINISH if the draft is complete
+and the critique has been addressed."""
+
+    decision = supervisor_llm.invoke([
+        SystemMessage(content=SUPERVISOR_PROMPT),
+        HumanMessage(content=status),
+    ])
+    next_agent = decision.next_agent
+    reason = decision.reason
+
+    # 4. GUARDRAILS — code overrides the LLM
+    if turn_count > MAX_TURNS:
+        next_agent = "FINISH"
+        reason = f"forced: turn cap {MAX_TURNS} exceeded"
+    elif (next_agent in ("writer", "critic")
+          and state["revision_count"] >= MAX_REVISIONS
+          and state.get("draft")):
+        next_agent = "FINISH"
+        reason = f"forced: revision cap {MAX_REVISIONS} reached"
+
+    return {
+        "next_agent": next_agent,
+        "turn_count": turn_count,
+        "execution_logs": [f"[turn {turn_count}] supervisor → {next_agent} ({reason})"],
+    }
 
 
 # ============================================================
