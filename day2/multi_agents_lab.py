@@ -431,7 +431,31 @@ if __name__ == "__main__":
         "execution_logs": [],
     }
     # TODO: compile, visualize, stream, print final draft + stats
+   print(app.get_graph().draw_mermaid())
 
+    # run 
+    config = {"configurable": {"thread_id": "day2-run-1"}}
+
+    final = None
+    for chunk in app.stream(initial_state, config, stream_mode="values"):
+        final = chunk
+        if chunk.get("execution_logs"):
+            print(chunk["execution_logs"][-1])
+
+    # print results 
+    print("\n" + "=" * 60)
+    print("FINAL DRAFT")
+    print("=" * 60)
+    print(final["draft"])
+
+    print("\n" + "=" * 60)
+    print("STATS")
+    print("=" * 60)
+    print(f"turns:           {final['turn_count']}")
+    print(f"revisions:       {final['revision_count']}")
+    print(f"research rounds: {len(final['research_notes'])}")
+    print(f"log entries:     {len(final['execution_logs'])}")
+# Additional experiments
 
 # ============================================================
 # SELF-CHECK before you look at the solution
