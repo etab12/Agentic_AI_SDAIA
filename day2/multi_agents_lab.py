@@ -1,10 +1,7 @@
 # ============================================================
 # DAY 2 LAB — SKELETON: Build a Multi-Agent Research Team
 # ============================================================
-# Fill in every TODO. Don't open the solution (day2_lab_solution.py)
-# until you pass the self-check at the bottom.
-#
-# WHAT CHANGES FROM DAY 1 — read this table twice:
+
 #
 #   Day 1 (single agent)              Day 2 (multi-agent)
 #   ─────────────────────             ─────────────────────────────
@@ -56,9 +53,14 @@ from langchain_core.messages import HumanMessage, SystemMessage
 # STEP 0 
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import InMemorySaver
+from langchain_openai import ChatOpenAI
+from langchain_tavily import TavilySearch
+from langchain_core.vectorstores import InMemoryVectorStore
 
 
 load_dotenv()
+
+USE_FAKE = os.getenv("USE_FAKE", "0") == "1"
 
 MAX_REVISIONS = 2      # cap on writer↔critic loops
 MAX_TURNS = 12         # cap on total supervisor decisions
@@ -85,14 +87,14 @@ MAX_TURNS = 12         # cap on total supervisor decisions
 
 class TeamState(TypedDict):
     task: str
-    research_notes: List[str]
+    research_notes: Annotated[List[str], operator.add]
     analysis: str
     draft: str
     critique: str
     revision_count: int
     turn_count: int
     next_agent: str
-    excustion_logs: Annotated[List[str], operator.add]
+    execution_logs: Annotated[List[str], operator.add]
 
 
 # ============================================================
@@ -160,25 +162,91 @@ PERSONAS = {
     ),
 }
 
-# Define llms, research tool, and the supervisor
+SUPERVISOR_PROMPT = (
+    "You are the SUPERVISOR of a research team (researcher, analyst, writer, critic). "
+    "Given the team's progress, pick who acts next. Standard order: researcher -> analyst -> writer -> critic. "
+    "If the critique starts with REVISE and revisions < max, send the writer. "
+    "If the critique is APPROVED or revisions are maxed out, FINISH."
+)
 
- llm = ChatOpenAI(
+if USE_FAKE:
+    class FakeWorker:
+        def __init__(self):
+            self.critic_calls = 0
+
+        def invoke_persona(self, role, _messages):
+            if role == "researcher":
+                return (
+                    "- Fact A: enterprises adopt supervisor-pattern agent teams (src: example.com/a)\n"
+                    "- Fact B: tool scoping reduces agent error rates (src: example.com/b)\n"
+                    "- Fact C: revision loops improve output quality (src: example.com/c)"
+                )
+            if role == "analyst":
+                return (
+                    "The pattern across sources: coordination, not raw model power, drives multi-agent value. "
+                    "Scoped tools and review loops are the recurring levers; unstructured agent swarms underperform supervised teams."
+                )
+            if role == "writer":
+                return (
+                    "HEADLINE: Supervised agent teams beat solo agents.\n"
+                    "Findings: (1) supervisor routing enables specialization; (2) tool scoping cuts errors; (3) critic loops raise quality.\n"
+                    "Recommendation: pilot a supervisor-pattern team on one workflow."
+                )
+            if role == "critic":
+                self.critic_calls += 1
+                if self.critic_calls == 1:
+                    return "REVISE: cite the sources from the research notes; quantify finding (2)."
+                return "APPROVED"
+            return ""
+
+    fake_worker = FakeWorker()
+
+    def run_persona(role: str, user_content: str) -> str:
+        return fake_worker.invoke_persona(role, user_content)
+
+    def supervisor_decide(state: TeamState) -> RouterDecision:
+        if not state["research_notes"]:
+            return RouterDecision(next_agent="researcher", reason="No research yet.")
+        if not state["analysis"]:
+            return RouterDecision(next_agent="analyst", reason="Research done, needs analysis.")
+        if not state["draft"]:
+            return RouterDecision(next_agent="writer", reason="Analysis done, needs a draft.")
+        if not state["critique"]:
+            return RouterDecision(next_agent="critic", reason="Draft ready for review.")
+        if state["critique"].startswith("REVISE") and state["revision_count"] < MAX_REVISIONS:
+            return RouterDecision(next_agent="writer", reason="Critic requested changes.")
+        return RouterDecision(next_agent="FINISH", reason="Draft approved (or revision cap hit).")
+
+else:
+    llm = ChatOpenAI(
         model="nvidia/nemotron-3-super-120b-a12b:free",
         temperature=0,
         base_url="https://openrouter.ai/api/v1",
     )
 
-search_tool = TavilySearch(max_results=4)
+    search_tool = TavilySearch(max_results=4)
+    supervisor_llm = llm.with_structured_output(RouterDecision)
 
-supervisor_llm = llm.with_structured_output(RouterDecision)
+    def run_persona(role: str, user_content: str) -> str:
+        response = llm.invoke([
+            SystemMessage(content=PERSONAS[role]),
+            HumanMessage(content=user_content),
+        ])
+        return response.content
 
-# run personas 
-def run_persona(role: str, user_content: str) -> str:
-    response = llm.invoke([
-        SystemMessage(content=PERSONAS[role]),
-        HumanMessage(content=user_content),
-    ])
-    return response.content
+    def supervisor_decide(state: TeamState) -> RouterDecision:
+        status = (
+            f"Task: {state['task']}\n"
+            f"Research notes: {'YES (' + str(len(state['research_notes'])) + ')' if state['research_notes'] else 'none'}\n"
+            f"Analysis: {'YES' if state['analysis'] else 'none'}\n"
+            f"Draft: {'YES' if state['draft'] else 'none'}\n"
+            f"Critique: {state['critique'] or 'none'}\n"
+            f"Revisions so far: {state['revision_count']} (max {MAX_REVISIONS})\n"
+        )
+        return supervisor_llm.invoke([
+            SystemMessage(content=SUPERVISOR_PROMPT),
+            HumanMessage(content=status),
+        ])
 
 
 # ============================================================
@@ -207,42 +275,31 @@ def run_persona(role: str, user_content: str) -> str:
 def supervisor_node(state: TeamState):
     turn_count = state["turn_count"] + 1
 
-    # 2. STATUS, not content — booleans and counts only
-    status = f"""Task: {state['task']}
+    status = (
+        f"Task: {state['task']}\n"
+        f"Research notes: {'YES (' + str(len(state['research_notes'])) + ')' if state['research_notes'] else 'none'}\n"
+        f"Analysis: {'YES' if state['analysis'] else 'none'}\n"
+        f"Draft: {'YES' if state['draft'] else 'none'}\n"
+        f"Critique: {state['critique'] or 'none'}\n"
+        f"Turn: {turn_count}/{MAX_TURNS}\n"
+        f"Revision_count: {state['revision_count']}/{MAX_REVISIONS}\n"
+    )
 
-Blackboard status:
-- research: {'FILLED' if state.get('research') else 'EMPTY'}
-- analysis: {'FILLED' if state.get('analysis') else 'EMPTY'}
-- draft: {'FILLED' if state.get('draft') else 'EMPTY'}
-- critique: {state.get('critique') or 'none yet'}
-
-turn_count: {turn_count}/{MAX_TURNS}
-revision_count: {state['revision_count']}/{MAX_REVISIONS}
-
-Which agent should act next? Choose FINISH if the draft is complete
-and the critique has been addressed."""
-
-    decision = supervisor_llm.invoke([
-        SystemMessage(content=SUPERVISOR_PROMPT),
-        HumanMessage(content=status),
-    ])
-    next_agent = decision.next_agent
-    reason = decision.reason
-
-    # 4. GUARDRAILS — code overrides the LLM
     if turn_count > MAX_TURNS:
-        next_agent = "FINISH"
-        reason = f"forced: turn cap {MAX_TURNS} exceeded"
-    elif (next_agent in ("writer", "critic")
-          and state["revision_count"] >= MAX_REVISIONS
-          and state.get("draft")):
-        next_agent = "FINISH"
-        reason = f"forced: revision cap {MAX_REVISIONS} reached"
+        decision = RouterDecision(next_agent="FINISH", reason=f"forced: turn cap {MAX_TURNS} exceeded")
+    else:
+        decision = supervisor_decide(state)
+        if (
+            decision.next_agent in ("writer", "critic")
+            and state["revision_count"] >= MAX_REVISIONS
+            and state.get("draft")
+        ):
+            decision = RouterDecision(next_agent="FINISH", reason=f"forced: revision cap {MAX_REVISIONS} reached")
 
     return {
-        "next_agent": next_agent,
+        "next_agent": decision.next_agent,
         "turn_count": turn_count,
-        "execution_logs": [f"[turn {turn_count}] supervisor → {next_agent} ({reason})"],
+        "execution_logs": [f"[turn {turn_count}] supervisor → {decision.next_agent} ({decision.reason})"],
     }
 
 
@@ -254,22 +311,25 @@ and the critique has been addressed."""
 
 def researcher_node(state: TeamState):
     """Search the web (ONLY this agent may), condense to notes."""
-    results = search_tool.invoke({"query": state["task"]})["results"]
- 
-    raw = "\n\n".join(
-        f"Title: {r['title']}\nContent: {r['content']}\nURL: {r['url']}"
-        for r in results
-    )
- 
-    notes = run_persona(
-        "researcher",
-        f"Task: {state['task']}\n\nSearch results:\n{raw}",
-    )
- 
+    if USE_FAKE:
+        notes = run_persona("researcher", state["task"])
+        source_count = 1
+    else:
+        results = search_tool.invoke({"query": state["task"]})["results"]
+        source_count = len(results)
+        raw = "\n\n".join(
+            f"Title: {r['title']}\nContent: {r['content']}\nURL: {r['url']}"
+            for r in results
+        )
+        notes = run_persona(
+            "researcher",
+            f"Task: {state['task']}\n\nSearch results:\n{raw}",
+        )
+
     # LIST — research_notes is append-only, so round 2 joins round 1
     return {
         "research_notes": [notes],
-        "execution_logs": [f"researcher: condensed {len(results)} sources into notes"],
+        "execution_logs": [f"researcher: condensed {source_count} sources into notes"],
     }
  
  
@@ -431,7 +491,7 @@ if __name__ == "__main__":
         "execution_logs": [],
     }
     # TODO: compile, visualize, stream, print final draft + stats
-   print(app.get_graph().draw_mermaid())
+    print(app.get_graph().draw_mermaid())
 
     # run 
     config = {"configurable": {"thread_id": "day2-run-1"}}
@@ -471,11 +531,4 @@ if __name__ == "__main__":
 # [ ] I can name one task where Day 1's single agent is the BETTER
 #     design (multi-agent is not free: more calls, more latency,
 #     more places to break — coordination must earn its cost)
-#
-# Stuck? Debugging order that works:
-#   1. stream_mode="updates" — watch each supervisor decision + reason
-#   2. print the status summary your supervisor_node builds — is the
-#      LLM seeing an accurate picture of the blackboard?
-#   3. check your conditional-edge dict covers ALL five decisions
-#   4. only THEN open day2_lab_solution.py
-# ============================================================
+
