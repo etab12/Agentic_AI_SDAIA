@@ -1,0 +1,6 @@
+.env
+**/.env
+*.swp
+__pycache__/
+.venv/
+.ipynb_checkpoints/

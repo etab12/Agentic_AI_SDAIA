@@ -1,0 +1,195 @@
+[
+  {
+    "id": "P01",
+    "title": "Attention Is All You Need",
+    "authors": [
+      "Ashish Vaswani",
+      "Noam Shazeer",
+      "Niki Parmar",
+      "Jakob Uszkoreit",
+      "Llion Jones",
+      "Aidan N. Gomez",
+      "Lukasz Kaiser",
+      "Illia Polosukhin"
+    ],
+    "year": 2017,
+    "venue": "NeurIPS 2017",
+    "arxiv_id": "1706.03762",
+    "url": "https://arxiv.org/abs/1706.03762",
+    "abstract": "Introduces the Transformer, a sequence transduction architecture based entirely on attention mechanisms, dispensing with recurrence and convolutions. The model is more parallelizable and requires significantly less time to train, achieving state-of-the-art BLEU scores on English-to-German and English-to-French machine translation."
+  },
+  {
+    "id": "P02",
+    "title": "Scaling Laws for Neural Language Models",
+    "authors": [
+      "Jared Kaplan",
+      "Sam McCandlish",
+      "Tom Henighan",
+      "Tom B. Brown",
+      "Benjamin Chess",
+      "Rewon Child",
+      "Scott Gray",
+      "Alec Radford",
+      "Jeffrey Wu",
+      "Dario Amodei"
+    ],
+    "year": 2020,
+    "venue": "arXiv preprint",
+    "arxiv_id": "2001.08361",
+    "url": "https://arxiv.org/abs/2001.08361",
+    "abstract": "Studies empirical scaling laws for language model performance on the cross-entropy loss. Loss scales as a power law with model size, dataset size, and compute used for training, with trends spanning more than seven orders of magnitude. Architectural details such as network width and depth have minimal effects within a wide range."
+  },
+  {
+    "id": "P03",
+    "title": "LoRA: Low-Rank Adaptation of Large Language Models",
+    "authors": [
+      "Edward J. Hu",
+      "Yelong Shen",
+      "Phillip Wallis",
+      "Zeyuan Allen-Zhu",
+      "Yuanzhi Li",
+      "Shean Wang",
+      "Lu Wang",
+      "Weizhu Chen"
+    ],
+    "year": 2021,
+    "venue": "ICLR 2022",
+    "arxiv_id": "2106.09685",
+    "url": "https://arxiv.org/abs/2106.09685",
+    "abstract": "Proposes freezing pretrained model weights and injecting trainable rank-decomposition matrices into each Transformer layer, greatly reducing the number of trainable parameters for downstream adaptation. Reduces trainable parameters by up to 10,000x and GPU memory requirements by 3x relative to full fine-tuning, with no additional inference latency."
+  },
+  {
+    "id": "P04",
+    "title": "Chain-of-Thought Prompting Elicits Reasoning in Large Language Models",
+    "authors": [
+      "Jason Wei",
+      "Xuezhi Wang",
+      "Dale Schuurmans",
+      "Maarten Bosma",
+      "Brian Ichter",
+      "Fei Xia",
+      "Ed H. Chi",
+      "Quoc V. Le",
+      "Denny Zhou"
+    ],
+    "year": 2022,
+    "venue": "NeurIPS 2022",
+    "arxiv_id": "2201.11903",
+    "url": "https://arxiv.org/abs/2201.11903",
+    "abstract": "Shows that generating a chain of intermediate reasoning steps significantly improves the ability of large language models to perform complex reasoning. The ability emerges naturally at sufficient model scale through a simple prompting method that supplies a few chain-of-thought demonstrations as exemplars, improving arithmetic, commonsense, and symbolic reasoning benchmarks."
+  },
+  {
+    "id": "P05",
+    "title": "ReAct: Synergizing Reasoning and Acting in Language Models",
+    "authors": [
+      "Shunyu Yao",
+      "Jeffrey Zhao",
+      "Dian Yu",
+      "Nan Du",
+      "Izhak Shafran",
+      "Karthik Narasimhan",
+      "Yuan Cao"
+    ],
+    "year": 2022,
+    "venue": "ICLR 2023",
+    "arxiv_id": "2210.03629",
+    "url": "https://arxiv.org/abs/2210.03629",
+    "abstract": "Explores interleaving reasoning traces and task-specific actions in language models, allowing the model to induce, track, and update action plans while also interfacing with external sources such as knowledge bases and environments. Reduces hallucination and error propagation relative to chain-of-thought alone, and outperforms imitation and reinforcement learning baselines on interactive decision-making benchmarks."
+  },
+  {
+    "id": "P06",
+    "title": "Toolformer: Language Models Can Teach Themselves to Use Tools",
+    "authors": [
+      "Timo Schick",
+      "Jane Dwivedi-Yu",
+      "Roberto Dessi",
+      "Roberta Raileanu",
+      "Maria Lomeli",
+      "Luke Zettlemoyer",
+      "Nicola Cancedda",
+      "Thomas Scialom"
+    ],
+    "year": 2023,
+    "venue": "NeurIPS 2023",
+    "arxiv_id": "2302.04761",
+    "url": "https://arxiv.org/abs/2302.04761",
+    "abstract": "Trains a language model to decide which external APIs to call, when to call them, what arguments to pass, and how to incorporate the results into future token prediction. Training data is generated in a self-supervised way requiring only a handful of demonstrations per API, yielding substantially improved zero-shot performance on tasks requiring calculators, search engines, calendars, and translation systems."
+  },
+  {
+    "id": "P07",
+    "title": "Reflexion: Language Agents with Verbal Reinforcement Learning",
+    "authors": [
+      "Noah Shinn",
+      "Federico Cassano",
+      "Edward Berman",
+      "Ashwin Gopinath",
+      "Karthik Narasimhan",
+      "Shunyu Yao"
+    ],
+    "year": 2023,
+    "venue": "NeurIPS 2023",
+    "arxiv_id": "2303.11366",
+    "url": "https://arxiv.org/abs/2303.11366",
+    "abstract": "Proposes reinforcing language agents through linguistic feedback rather than weight updates. Agents verbally reflect on task feedback signals and maintain reflective text in an episodic memory buffer to induce better decision-making in subsequent trials. Achieves substantial improvements on sequential decision-making, coding, and reasoning tasks, including a 91% pass@1 on HumanEval."
+  },
+  {
+    "id": "P08",
+    "title": "Generative Agents: Interactive Simulacra of Human Behavior",
+    "authors": [
+      "Joon Sung Park",
+      "Joseph C. O'Brien",
+      "Carrie J. Cai",
+      "Meredith Ringel Morris",
+      "Percy Liang",
+      "Michael S. Bernstein"
+    ],
+    "year": 2023,
+    "venue": "UIST 2023",
+    "arxiv_id": "2304.03442",
+    "url": "https://arxiv.org/abs/2304.03442",
+    "abstract": "Introduces computational agents that simulate believable human behavior in an interactive sandbox environment. An architecture extends a large language model with memory storage and retrieval, reflection into higher-level inferences, and dynamic planning. Twenty-five agents produce emergent social behaviors such as spreading invitations, forming relationships, and coordinating a party."
+  },
+  {
+    "id": "P09",
+    "title": "Lost in the Middle: How Language Models Use Long Contexts",
+    "authors": [
+      "Nelson F. Liu",
+      "Kevin Lin",
+      "John Hewitt",
+      "Ashwin Paranjape",
+      "Michele Bevilacqua",
+      "Fabio Petroni",
+      "Percy Liang"
+    ],
+    "year": 2023,
+    "venue": "TACL 2024",
+    "arxiv_id": "2307.03172",
+    "url": "https://arxiv.org/abs/2307.03172",
+    "abstract": "Analyzes how language models use information in long input contexts across multi-document question answering and key-value retrieval. Performance is highest when relevant information occurs at the beginning or end of the input context, and degrades significantly when models must access relevant information in the middle of long contexts, even for explicitly long-context models."
+  },
+  {
+    "id": "P10",
+    "title": "AutoGen: Enabling Next-Gen LLM Applications via Multi-Agent Conversation",
+    "authors": [
+      "Qingyun Wu",
+      "Gagan Bansal",
+      "Jieyu Zhang",
+      "Yiran Wu",
+      "Beibin Li",
+      "Erkang Zhu",
+      "Li Jiang",
+      "Xiaoyun Zhang",
+      "Shaokun Zhang",
+      "Jiale Liu",
+      "Ahmed Hassan Awadallah",
+      "Ryen W. White",
+      "Doug Burger",
+      "Chi Wang"
+    ],
+    "year": 2023,
+    "venue": "COLM 2024",
+    "arxiv_id": "2308.08155",
+    "url": "https://arxiv.org/abs/2308.08155",
+    "abstract": "Presents an open-source framework for building applications from multiple conversable agents that interact to solve tasks. Agents are customizable, can operate in modes combining language models, human input, and tools, and coordinate through conversation programmed with both natural language and code. Demonstrated across mathematics, coding, question answering, operations research, and entertainment domains."
+  }
+]
