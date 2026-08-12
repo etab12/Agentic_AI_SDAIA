@@ -62,7 +62,7 @@ load_dotenv()
 
 USE_FAKE = os.getenv("USE_FAKE", "0") == "1"
 
-MAX_REVISIONS = 2      # cap on writer↔critic loops
+MAX_REVISIONS = 0    # cap on writer↔critic loops
 MAX_TURNS = 12         # cap on total supervisor decisions
 
 
